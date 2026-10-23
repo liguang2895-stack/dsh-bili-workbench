@@ -37,6 +37,18 @@ export const name = 'bili-workbench'
 export const inject = ['webServer']
 
 const BV_RE = /^BV[0-9A-Za-z]{10}$/
+
+/**
+ * 过滤 bili 返回的条目：丢掉没有合法 BV 号的。
+ *
+ * 为什么需要：B站 热门/搜索里会混进广告位、合集卡片、直播推荐等条目，
+ * 它们的 bvid 是空字符串。原样透传给前端会造成——
+ *   · 卡片没有封面（/cover 收到空 bv 返回 400）
+ *   · 「看懂视频」「打开」「评论」全部指向空 BV
+ * 在服务端边界处挡掉，比在每个调用点各写一遍判断可靠。
+ */
+const usableItems = (items) => (Array.isArray(items) ? items : [])
+  .filter((it) => it && BV_RE.test(String(it.bvid || '').trim()))
 const ZONES = new Set(['all', 'anime', 'music', 'dance', 'game', 'knowledge', 'tech', 'sports', 'car',
   'life', 'food', 'animal', 'kichiku', 'fashion', 'ent', 'film', 'original', 'rookie'])
 const TIERS = new Set(['值得看', '可以看', '跳过'])
@@ -526,7 +538,7 @@ export function apply(ctx) {
         ? ['hot', 'rank', '--zone', zone, '--limit', String(size)]
         : ['hot', 'popular', '--size', String(size)]
       const r = await runBili(args, { timeoutMs: 40000 })
-      return sendJson(res, 200, { ok: r.ok, kind, zone, items: r.data?.items || [], error: r.error || null })
+      return sendJson(res, 200, { ok: r.ok, kind, zone, items: usableItems(r.data?.items), error: r.error || null })
     }
     if (req.method === 'GET' && path === '/search') {
       const kw = String(q.get('q') || '').trim().slice(0, 60)
@@ -534,7 +546,7 @@ export function apply(ctx) {
       const size = Math.max(1, Math.min(Number(q.get('size')) || 20, 50))
       const order = ['default', 'views', 'new', 'danmaku', 'favorites', 'comments'].includes(String(q.get('order'))) ? String(q.get('order')) : 'default'
       const r = await runBili(['search', 'video', kw, '--order', order, '--size', String(size)], { timeoutMs: 45000 })
-      return sendJson(res, 200, { ok: r.ok, keyword: kw, total: r.data?.total || 0, items: r.data?.items || [], error: r.error || null })
+      return sendJson(res, 200, { ok: r.ok, keyword: kw, total: r.data?.total || 0, items: usableItems(r.data?.items), error: r.error || null })
     }
     if (req.method === 'GET' && path === '/video') {
       const bv = String(q.get('bv') || '').trim()

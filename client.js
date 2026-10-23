@@ -800,10 +800,12 @@ window.__ModuleLoader__.load({
       const view = it.stat?.view ?? it.play
       const like = it.stat?.like ?? it.like
       const up = it.author?.name || it.up?.name || it.owner?.name || ''
+      // 兜底：没有合法 BV 号就不发封面请求（服务端已过滤，这里防漏网）
+      const hasBv = /^BV[0-9A-Za-z]{10}$/.test(String(bv || ''))
       return h('div', { 'data-wb-card': '' },
-        h('div', { 'data-wb-cover': '' },
-          h('span', {}, bv),
-          h('img', { src: `${API}/cover?bv=${bv}`, alt: '', loading: 'lazy', onError: (e) => { e.target.style.display = 'none'; const p = e.target.parentElement; if (p) p.setAttribute('data-noimg', '') } }),
+        h('div', { 'data-wb-cover': '', 'data-noimg': hasBv ? undefined : '' },
+          h('span', {}, bv || '无编号'),
+          hasBv ? h('img', { src: `${API}/cover?bv=${bv}`, alt: '', loading: 'lazy', onError: (e) => { e.target.style.display = 'none'; const p = e.target.parentElement; if (p) p.setAttribute('data-noimg', '') } }) : null,
           tier ? h(Tier, { t: tier }) : null,
           it.duration ? h('span', { 'data-wb-dur': '' }, fmtDur(it.duration)) : null),
         h('div', { 'data-wb-body': '' },
