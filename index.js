@@ -24,6 +24,7 @@ import {
 import * as plans from './engine/planstore.mjs'
 import * as renders from './engine/render.mjs'
 import * as interact from './engine/interact.mjs'
+import * as tasks from './engine/taskstore.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ENGINE = join(HERE, 'engine')
@@ -253,6 +254,31 @@ function runOp(script, args = [], timeoutMs = 60_000) {
 }
 
 let roundRunning = false
+let taskRunning = false
+
+/**
+ * 后台跑一个长任务（不阻塞 HTTP 和定时器）。
+ * 任务自己会去 B站 逛、采素材、判定、写方案，最长跑 45 分钟。
+ * 和日常采集互斥：两边都会写素材库，同时跑容易互相打断。
+ */
+function kickTask(id = '') {
+  if (taskRunning || roundRunning) return false
+  taskRunning = true
+  ;(async () => {
+    try {
+      const args = ['--tick']
+      if (id) args.push('--id', id)
+      const r = await runEngine('task.mjs', args, 45 * 60_000)
+      if (r.text) log('任务：' + r.text.slice(-1500))
+    } catch (e) {
+      log('任务异常：' + (e?.message ?? e))
+    } finally {
+      taskRunning = false
+    }
+  })()
+  return true
+}
+
 /** 一轮：采集（热门 + 关键词混合）→ 判定/热梗 → 自动评论 → 日报 */
 async function runRound(why = 'manual', { count = 1 } = {}) {
   if (roundRunning) return { ok: false, error: '上一轮还在跑' }
@@ -823,6 +849,79 @@ export function apply(ctx) {
       try { return sendJson(res, 200, { ok: true, prompt: plans.promptFor(id, v) }) } catch (e) {
         return sendJson(res, 200, { ok: false, error: String(e?.message ?? e) })
       }
+    }
+
+    /* ══════════ 长任务：素材不够就自己去 B站 找 ══════════ */
+    if (req.method === 'GET' && path === '/task/list') {
+      const rows = tasks.list()
+      return sendJson(res, 200, {
+        ok: true,
+        tasks: rows,
+        active: rows.filter((t) => !['ready', 'failed'].includes(t.status)).length,
+        running: taskRunning,
+      })
+    }
+    if (req.method === 'POST' && path === '/task/create') {
+      const body = await readBody(req)
+      const brief = String(body.brief || '').trim().slice(0, 300)
+      if (!brief) return sendJson(res, 200, { ok: false, error: '先写一句你想做什么样的片子' })
+      const task = tasks.create({
+        brief,
+        maxDays: Number(body.maxDays) || 5,
+        intervalMinutes: Number(body.intervalMinutes) || 180,
+        needed: Number(body.needed) || 3,
+      })
+      log(`新任务 ${task.id}：${brief}`)
+      const t = setTimeout(() => { kickTask(task.id) }, 800)
+      t.unref?.()
+      return sendJson(res, 200, { ok: true, task })
+    }
+    if (req.method === 'POST' && path === '/task/tick') {
+      const body = await readBody(req)
+      const id = String(body.id || '')
+      if (id && !tasks.get(id)) return sendJson(res, 200, { ok: false, error: '任务不存在' })
+      if (taskRunning) return sendJson(res, 200, { ok: false, error: '已经有一个任务在跑，等它跑完' })
+      if (roundRunning) return sendJson(res, 200, { ok: false, error: '日常采集正在跑，稍后再试' })
+      const started = kickTask(id)
+      return sendJson(res, 200, { ok: started, started, error: started ? '' : '任务已在跑' })
+    }
+    if (req.method === 'POST' && path === '/task/pause') {
+      const body = await readBody(req)
+      const id = String(body.id || '')
+      const t = tasks.update(id, { status: 'paused' })
+      if (!t) return sendJson(res, 200, { ok: false, error: '任务不存在' })
+      tasks.addLog(id, '已暂停')
+      return sendJson(res, 200, { ok: true, task: t })
+    }
+    if (req.method === 'POST' && path === '/task/resume') {
+      const body = await readBody(req)
+      const id = String(body.id || '')
+      const t = tasks.update(id, { status: 'queued', nextRunAt: new Date().toISOString(), lastError: '' })
+      if (!t) return sendJson(res, 200, { ok: false, error: '任务不存在' })
+      tasks.addLog(id, '已继续')
+      const tm = setTimeout(() => { kickTask(id) }, 800)
+      tm.unref?.()
+      return sendJson(res, 200, { ok: true, task: t })
+    }
+    if (req.method === 'POST' && path === '/task/retry') {
+      const body = await readBody(req)
+      const id = String(body.id || '')
+      const cur = tasks.get(id)
+      if (!cur) return sendJson(res, 200, { ok: false, error: '任务不存在' })
+      // 过期任务手动重试：从现在起再给一个完整期限
+      const expired = Date.parse(cur.deadline || '') < Date.now()
+      const deadline = expired ? new Date(Date.now() + (cur.maxDays || 5) * 86400_000).toISOString() : cur.deadline
+      const t = tasks.update(id, { status: 'queued', nextRunAt: new Date().toISOString(), lastError: '', deadline })
+      tasks.addLog(id, expired ? `手动重试，期限顺延到 ${String(deadline).slice(0, 10)}` : '手动重试')
+      const tm = setTimeout(() => { kickTask(id) }, 500)
+      tm.unref?.()
+      return sendJson(res, 200, { ok: true, task: t })
+    }
+    if (req.method === 'POST' && path === '/task/delete') {
+      const body = await readBody(req)
+      const id = String(body.id || '')
+      const ok = tasks.remove(id)
+      return sendJson(res, 200, ok ? { ok: true } : { ok: false, error: '任务不存在' })
     }
 
     /* ══════════ 出片：方案 → 真实素材渲染 ══════════ */
