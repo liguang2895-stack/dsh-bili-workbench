@@ -1,0 +1,217 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>B站工作台 · 素材库</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="shell">
+
+  <!-- 侧栏：产品名 + 作用域，导航中性灰药丸 -->
+  <aside class="side">
+    <div class="brand">
+      <div class="brand-mark">WB</div>
+      <div>
+        <div class="brand-name">B站工作台</div>
+        <div class="brand-scope">出齊東门 · 素材 → 出片 → 发布</div>
+      </div>
+    </div>
+
+    <button class="nav-item" aria-current="page">
+      <svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M2.5 3.5h5v9h-5z"/><path d="M8.5 3.5h5v9h-5z"/></svg>
+      素材库
+      <span class="nav-count">21</span>
+    </button>
+    <button class="nav-item">
+      <svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="2" y="3.5" width="12" height="9" rx="1.5"/><path d="M6.8 6.6v2.8l2.4-1.4z" fill="currentColor" stroke="none"/></svg>
+      刷B站
+    </button>
+    <button class="nav-item">
+      <svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M3 13.5V9.5M6.3 13.5V5M9.7 13.5V7.5M13 13.5V3"/></svg>
+      创作 / 出片
+      <span class="nav-count">2</span>
+    </button>
+    <button class="nav-item">
+      <svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M3 2.5h10v11L8 11l-5 2.5z"/></svg>
+      审核 / 发布
+      <span class="nav-count">2</span>
+    </button>
+
+    <div class="nav-label">账号</div>
+    <button class="nav-item">
+      <svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="5.5" r="2.5"/><path d="M3 13.5c0-2.5 2.2-4 5-4s5 1.5 5 4"/></svg>
+      我的
+    </button>
+
+    <div class="side-foot">
+      <button class="btn" data-quiet style="width:100%;justify-content:flex-start">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10 3.5 5.5 8l4.5 4.5"/></svg>
+        收起
+      </button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="canvas">
+
+      <!-- 标题行：名词 + 这一屏的发现 -->
+      <div class="pagehead">
+        <div>
+          <h1>素材库</h1>
+          <div class="sub">21 条素材，其中 8 条带可引用片段。有 3 条还没判定，去「刷B站」跑一轮。</div>
+        </div>
+        <div class="actions">
+          <input type="search" placeholder="搜标题 / 点评 / 金句" style="width:230px" aria-label="搜索素材">
+          <button class="btn">刷新</button>
+        </div>
+      </div>
+
+      <!-- KPI 条：一个容器，1px 分割。
+           第一格回答这一屏的问题「今天还差什么」，不是库存盘点。 -->
+      <div class="kpis" style="margin-top:20px">
+        <div class="kpi">
+          <div class="kpi-label">待判定</div>
+          <div class="kpi-v">3<span class="u">条</span></div>
+          <div class="kpi-cap">去「刷B站」跑一轮</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">可引用片段</div>
+          <div class="kpi-v">64<span class="u">处</span></div>
+          <div class="kpi-cap">来自 18 条带字幕的视频</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">创作篮</div>
+          <div class="kpi-v">0<span class="u">条</span></div>
+          <div class="kpi-cap">未选料</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">库内合计</div>
+          <div class="kpi-v">21<span class="u">条</span></div>
+          <div class="kpi-cap">12 MB · 187 个文件</div>
+        </div>
+      </div>
+
+      <!-- 范围行 -->
+      <div class="scoperow">
+        <div class="seg" role="tablist">
+          <button class="btn" role="tab" aria-selected="true">列表</button>
+          <button class="btn" role="tab" aria-selected="false">卡片</button>
+        </div>
+        <div class="grow"></div>
+        <span class="chip">全部 21</span>
+        <span class="chip">值得看 6</span>
+        <span class="chip">可以看 9</span>
+        <span class="chip">跳过 3</span>
+        <span class="chip">未判定 3</span>
+      </div>
+
+      <!-- 素材列表 -->
+      <div class="panel" style="padding:0 16px">
+
+        <div class="mat">
+          <div class="mat-thumb">
+            <img src="media/BV12Jnb6yEmd-cover.jpg" alt="视频封面">
+            <span class="dur">1:10:18</span>
+          </div>
+          <div class="mat-body">
+            <div class="mat-head">
+              <div class="mat-title">独自在北极草原露营3天，采蘑菇、钓肥鱼，过上富足生活</div>
+              <span class="chip" data-pos>已评论</span>
+            </div>
+            <div class="meta">蜀犬吠日SCFR · 采集于 10-23 · <b>4 条可用片段</b> · 播放 5.3万 · 点赞 8,069</div>
+            <div class="verdict" data-tier="值得看">真实现场感的户外长片，节奏慢但信息密度够，蘑菇与钓鱼两段可各取一处做实证画面</div>
+
+            <div class="quotes">
+              <div class="q"><time>08:12</time><span>这边的蘑菇一抓一大把，但你得认得哪个能吃</span></div>
+              <div class="q"><time>31:40</time><span>钓上来的这条比我手臂还粗</span></div>
+            </div>
+
+            <!-- 签名元素：胶片条，每帧带时间码 -->
+            <div class="strip">
+              <figure><img src="media/BV12Jnb6yEmd-f1.jpg" alt="关键帧"><figcaption>00:12</figcaption></figure>
+              <figure><img src="media/BV12Jnb6yEmd-f2.jpg" alt="关键帧"><figcaption>07:05</figcaption></figure>
+              <figure><img src="media/BV12Jnb6yEmd-f3.jpg" alt="关键帧"><figcaption>14:38</figcaption></figure>
+              <figure><img src="media/BV12Jnb6yEmd-f4.jpg" alt="关键帧"><figcaption>31:40</figcaption></figure>
+              <figure><img src="media/BV12Jnb6yEmd-f5.jpg" alt="关键帧"><figcaption>35:09</figcaption></figure>
+              <figure><img src="media/BV12Jnb6yEmd-f6.jpg" alt="关键帧"><figcaption>48:20</figcaption></figure>
+            </div>
+
+            <div class="row" style="border:0;padding:10px 0 0">
+              <button class="btn" data-sm>逐字稿 / 详情</button>
+              <button class="btn" data-sm>加入创作篮</button>
+              <div class="grow"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mat">
+          <div class="mat-thumb">
+            <img src="media/BV12Vns6AEna-cover.jpg" alt="视频封面">
+            <span class="dur">5:45</span>
+          </div>
+          <div class="mat-body">
+            <div class="mat-head">
+              <div class="mat-title">kimi Ai大模型编写PLC程序，建议学习</div>
+              <span class="chip" data-pos>已评论</span>
+            </div>
+            <div class="meta">俊杰工控PLC · 采集于 10-23 · <b>4 条可用片段</b> · 播放 165 · 点赞 7</div>
+            <div class="verdict" data-tier="可以看">选题切中，但画面是录屏、讲述偏平，适合当论据不适合当主视觉</div>
+
+            <div class="quotes">
+              <div class="q"><time>01:22</time><span>你把工艺描述清楚，它就能给你出梯形图</span></div>
+              <div class="q"><time>03:48</time><span>这里它生成的定时器逻辑其实是错的</span></div>
+            </div>
+
+            <div class="strip" data-flat>
+              <figure><img src="media/BV12Vns6AEna-f1.jpg" alt="关键帧"><figcaption>00:30</figcaption></figure>
+              <figure><img src="media/BV12Vns6AEna-f2.jpg" alt="关键帧"><figcaption>01:22</figcaption></figure>
+              <figure><img src="media/BV12Vns6AEna-f3.jpg" alt="关键帧"><figcaption>02:10</figcaption></figure>
+              <figure><img src="media/BV12Vns6AEna-f4.jpg" alt="关键帧"><figcaption>03:48</figcaption></figure>
+              <figure><img src="media/BV12Vns6AEna-f5.jpg" alt="关键帧"><figcaption>04:35</figcaption></figure>
+              <figure><img src="media/BV12Vns6AEna-f6.jpg" alt="关键帧"><figcaption>05:20</figcaption></figure>
+            </div>
+
+            <div class="row" style="border:0;padding:10px 0 0">
+              <button class="btn" data-sm>逐字稿 / 详情</button>
+              <button class="btn" data-sm>加入创作篮</button>
+              <div class="grow"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mat">
+          <div class="mat-thumb" data-empty>
+            <span class="thumb-empty">无封面</span>
+            <span class="dur">3:16</span>
+          </div>
+          <div class="mat-body">
+            <div class="mat-head">
+              <div class="mat-title">“大肥鱼适合做女朋友吗？”</div>
+              <span class="chip">未评论</span>
+            </div>
+            <div class="meta">学姐圆 · 采集于 10-23 · 0 条可用片段 · 播放 20.4万 · 点赞 16,415</div>
+            <div class="verdict" data-tier="跳过">纯情绪向整活，没有可引用的信息点</div>
+
+            <div class="empty" style="margin-top:10px;text-align:left;padding:12px 14px">
+              这条没有可用片段 —— 无字幕，或抽帧没抽到有信息量的画面。仍可点击「逐字稿 / 详情」看原文。
+            </div>
+
+            <div class="row" style="border:0;padding:10px 0 0">
+              <button class="btn" data-sm>逐字稿 / 详情</button>
+              <button class="btn" data-sm>加入创作篮</button>
+              <div class="grow"></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

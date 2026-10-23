@@ -27,3 +27,9 @@ launcher/
 # OS
 .DS_Store
 Thumbs.db
+.taste-skill/
+
+
+# mockup 的素材图来自本机素材库，不入库
+workbench-mockup/media/
+
