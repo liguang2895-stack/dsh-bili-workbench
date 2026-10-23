@@ -377,6 +377,21 @@ function pctFromLine(line, job) {
     return Math.min(44, 14 + Math.round((n / Math.max(1, job.totalShots || 8)) * 30))
   }
   if (/③\s*渲染画面/.test(line)) return 48
+  /* Remotion 持续输出 "Rendered 1923/1931" 和 "Encoded 1494/1931"。
+     原来这两行没被解析，进度从 48% 一直卡到 74%（实测卡了 210 秒），
+     看起来像卡死。这里按真实帧数把 48%→74% 之间插值出来。 */
+  const rendered = /Rendered\s+(\d+)\s*\/\s*(\d+)/.exec(line)
+  if (rendered) {
+    const cur = Number(rendered[1]) || 0
+    const total = Number(rendered[2]) || 0
+    if (total > 0) return Math.min(72, 48 + Math.round((cur / total) * 24))
+  }
+  const encoded = /Encoded\s+(\d+)\s*\/\s*(\d+)/.exec(line)
+  if (encoded) {
+    const cur = Number(encoded[1]) || 0
+    const total = Number(encoded[2]) || 0
+    if (total > 0) return Math.min(73, 72 + Math.round((cur / total)))
+  }
   if (/渲染耗时/.test(line)) return 74
   if (/④\s*合入旁白/.test(line)) return 82
   if (/⑤\s*烧字幕/.test(line)) return 89

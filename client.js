@@ -79,14 +79,21 @@ window.__ModuleLoader__.load({
       const [tick, setTick] = useState(0)
       const pathRef = useRef(path)
       pathRef.current = path
+      // 已经拿到过数据后，再次请求（轮询 / 手动刷新）不再把 loading 打开。
+      // 否则每 4 秒整块列表会被「读取中…」替换一次 —— 界面上就是持续闪烁。
+      const hadData = useRef(false)
       useEffect(() => {
         if (!path || !auto) return
         let live = true
-        setSt((s) => ({ ...s, loading: true, err: '' }))
+        setSt((s) => (hadData.current ? { ...s, err: '' } : { ...s, loading: true, err: '' }))
         jget(path).then((r) => {
           if (!live) return
-          if (r && r.ok !== false) setSt({ loading: false, data: r, err: '' })
-          else setSt({ loading: false, data: r, err: errText(r) || '取数失败' })
+          if (r && r.ok !== false) {
+            hadData.current = true
+            setSt({ loading: false, data: r, err: '' })
+          } else {
+            setSt((s) => ({ loading: false, data: hadData.current ? s.data : r, err: errText(r) || '取数失败' }))
+          }
         })
         return () => { live = false }
       }, [path, tick, auto])
@@ -1259,18 +1266,26 @@ window.__ModuleLoader__.load({
         h('div', { 'data-wb-row': '' },
           h(Btn, { sm: true, onClick: () => setShowShots(!showShots) }, showShots ? '收起分镜' : '看分镜'),
           h(Btn, { sm: true, disabled: busy === 'render' || job?.stage === 'running', onClick: render }, job?.stage === 'running' ? '渲染中…' : (pct === 100 ? '重新渲染' : '开始渲染')),
-          h(Btn, { sm: true, disabled: !pct || !runId, onClick: togglePreview }, '预览成片'),
+          h(Btn, { sm: true, disabled: !runId || job?.stage === 'running', onClick: togglePreview }, '预览成片'),
           h('div', { 'data-wb-grow': '' }),
           h('span', { 'data-wb-meta': '' }, `引用素材 ${picks.length} 处${basket.length ? ` · 创作篮 ${basket.length}` : ''}`)),
         showShots ? h('div', { 'data-wb-col': '' }, ...shots.map((s, i) => h('div', { key: i, 'data-wb-quote': '' },
           h('b', {}, `${i + 1}. ${s.kind}`), ' ', s.headline || '', s.body ? ` — ${s.body}` : '',
           h('div', { 'data-wb-meta': '', style: { marginTop: '3px' } },
             [s.narration, s.source ? `引用 ${s.source.bv} @${mmss(s.source.t)}` : ''].filter(Boolean).join(' · '))))) : null,
+        /* 渲染失败：错误要独立成块，不能只藏在日志里。
+           之前 job.error 只在「看渲染日志」旁边显示一行小字，
+           用户看不到真正原因（比如 edge-tts 连不上微软语音服务）。 */
+        job?.stage === 'failed' || job?.error ? h('div', { 'data-wb-err': '', style: { marginTop: '8px' } },
+          h('b', {}, '渲染失败'),
+          job?.error ? h('div', { style: { marginTop: '4px', whiteSpace: 'pre-wrap' } }, String(job.error).slice(0, 600)) : null,
+          h('div', { style: { marginTop: '6px', fontSize: '11.5px' } },
+            '完整日志在下面「看渲染日志」里。配音失败通常是网络问题，重试一次往往就好。')) : null,
         msg ? h(Note, {}, msg) : null,
         job?.log ? h('div', { 'data-wb-col': '' },
           h('div', { 'data-wb-row': '' },
             h(Btn, { sm: true, onClick: () => setLogOpen(!logOpen) }, logOpen ? '收起渲染日志' : '看渲染日志'),
-            job.error ? h('span', { 'data-wb-note': '', style: { color: '#f87171' } }, job.error.slice(0, 160)) : null),
+            h('span', { 'data-wb-note': '' }, `渲染中 ${job.pct || 0}%`)),
           logOpen ? h('pre', { 'data-wb-pre': '' }, job.log.slice(-2600)) : null) : null,
         preview ? h('div', { 'data-wb-overlay': '' },
           h('button', { className: 'x', onClick: () => setPreview('') }, '✕'),

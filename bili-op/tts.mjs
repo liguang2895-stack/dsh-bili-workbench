@@ -12,7 +12,7 @@
  * 为什么不用 ASR：配音本来就是从文本生成的，时间戳直接由 TTS 给 ⇒ 零错字、零等待。
  * 间隔 gap 是留给"换气"和转场的，默认 0.35 秒。
  */
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
 import { join, dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -101,14 +101,40 @@ async function main() {
     const mp3 = join(audioDir, `shot-${n}.mp3`)
     const srt = join(audioDir, `shot-${n}.srt`)
     const t0 = Date.now()
-    execFileSync(BIN, [
-      '--text', shot.narration,
-      '--voice', voice,
-      '--write-media', mp3,
-      '--write-subtitles', srt,
-    ], { stdio: 'ignore', windowsHide: true })
+
+    // edge-tts 走微软的在线语音服务，会因网络抖动失败（WinError 64 / 连接被重置）。
+    // 实测失败率约 1/6 且会聚集出现，所以重试要够多次、退避要够长。
+    // 原来用 stdio:'ignore' 把 stderr 全吞了，界面上只看到「渲染失败」四个字。
+    let lastErr = null
+    for (let attempt = 1; attempt <= 6; attempt++) {
+      try {
+        const r = spawnSync(BIN, [
+          '--text', shot.narration,
+          '--voice', voice,
+          '--write-media', mp3,
+          '--write-subtitles', srt,
+        ], { encoding: 'utf8', windowsHide: true, timeout: 90000 })
+        if (r.status === 0) { lastErr = null; break }
+        lastErr = (r.stderr || r.stdout || '').trim() || `edge-tts 退出码 ${r.status}`
+      } catch (e) {
+        lastErr = String(e?.stderr || e?.message || e)
+      }
+      const brief = lastErr.split('\n').filter((l) => l.trim()).slice(-1)[0] || lastErr
+      console.error(`  第 ${n} 镜配音失败（第 ${attempt}/6 次）：${brief.slice(0, 160)}`)
+      if (attempt < 6) await new Promise((r) => setTimeout(r, 800 * attempt))
+    }
+
+    if (lastErr) {
+      const brief = String(lastErr).split('\n').filter((l) => l.trim()).slice(-1)[0] || String(lastErr)
+      throw new Error(
+        `配音失败：${BIN} 连不上微软语音服务。\n` +
+        `原因：${brief.slice(0, 300)}\n` +
+        `这是网络问题，不是配置问题。可以：① 挂代理后重试 ② 换一个能连 speech.platform.bing.com 的网络 ③ 在「刷B站 → 设置」里换音色再试`,
+      )
+    }
+
     const sec = probeSeconds(mp3)
-    if (sec <= 0) throw new Error(`第 ${n} 镜配音时长读不出来：${mp3}`)
+    if (sec <= 0) throw new Error(`第 ${n} 镜配音时长读不出来：${mp3}（文件可能是空的）`)
 
     // 字幕平移：整体挪到这一镜的起点
     for (const c of parseSrt(readFileSync(srt, 'utf8'))) {
