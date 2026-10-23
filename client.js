@@ -421,13 +421,26 @@ window.__ModuleLoader__.load({
 [data-wb-cover]{
   position:relative; aspect-ratio:16/9; overflow:hidden;
   background:var(--g3);
-  display:flex; align-items:center; justify-content:center;
-  color:var(--faint); font-size:11px; font-family:ui-monospace,Consolas,monospace;
+  /* 不用 flex 居中：容器里同时有兜底文字和 img 时 flex 会把两者并排，
+     img 被推到右侧、左边露出灰底（刷B站卡片就是这个症状）。
+     改成 img 绝对定位铺满，兜底文字单独一层。 */
 }
-[data-wb-cover] img{width:100%; height:100%; object-fit:cover; display:block}
-[data-wb-cover] [data-wb-tier]{position:absolute; top:7px; left:7px}
+[data-wb-cover] img{
+  position:absolute; inset:0;
+  width:100%; height:100%; object-fit:cover; display:block;
+}
+/* 兜底文字（BV 号 / 状态文案）：只在没有图时可见，绝对定位不参与布局 */
+[data-wb-cover] > span:first-child{
+  position:absolute; inset:0;
+  display:flex; align-items:center; justify-content:center;
+  padding:0 8px; text-align:center; overflow:hidden;
+  color:var(--faint); font-size:11px;
+  font-family:ui-monospace,Consolas,monospace;
+}
+[data-wb-cover]:has(img) > span:first-child{display:none}
+[data-wb-cover] [data-wb-tier]{position:absolute; top:7px; left:7px; z-index:2}
 [data-wb-cover] [data-wb-dur]{
-  position:absolute; right:5px; bottom:5px;
+  position:absolute; right:5px; bottom:5px; z-index:2;
   padding:1px 5px; border-radius:3px;
   background:rgba(0,0,0,.72); color:#fff;
   font-size:11px; font-variant-numeric:tabular-nums;
@@ -445,14 +458,28 @@ window.__ModuleLoader__.load({
   border-bottom:1px solid var(--rule);
 }
 [data-wb-mat]:last-child{border-bottom:0}
+/* 封面缺失：不留一块无解释的灰。
+   onError 时给容器加 data-noimg，露出一行说明 —— 用户知道是「没抓到」而不是「坏了」。 */
+[data-wb-mat] [data-wb-thumb][data-noimg]::after,
+[data-wb-cover][data-noimg]::after{
+  content:"无封面";
+  position:absolute; inset:0;
+  display:flex; align-items:center; justify-content:center;
+  font-size:11px; color:var(--faint);
+  font-family:inherit;
+}
 [data-wb-mat] [data-wb-thumb]{
   position:relative; aspect-ratio:16/9;
   border-radius:6px; overflow:hidden;
   background:var(--g3);
 }
-[data-wb-mat] [data-wb-thumb] img{width:100%; height:100%; object-fit:cover; display:block}
+/* 绝对定位铺满：图裂时（onError 把 img 隐藏）容器不会塌陷成 0 高 */
+[data-wb-mat] [data-wb-thumb] img{
+  position:absolute; inset:0;
+  width:100%; height:100%; object-fit:cover; display:block;
+}
 [data-wb-mat] [data-wb-thumb] [data-wb-dur]{
-  position:absolute; right:5px; bottom:5px;
+  position:absolute; right:5px; bottom:5px; z-index:2;
   padding:1px 5px; border-radius:3px;
   background:rgba(0,0,0,.72); color:#fff;
   font-size:11px; font-variant-numeric:tabular-nums;
@@ -612,7 +639,7 @@ window.__ModuleLoader__.load({
       const frames = r.frames || []
       return h('div', { 'data-wb-mat': '' },
         h('div', { 'data-wb-thumb': '' },
-          h('img', { src: API + '/store/media?kind=cover&bv=' + r.bvid, alt: '', loading: 'lazy', onError: (e) => { e.target.style.display = 'none' } }),
+          h('img', { src: API + '/store/media?kind=cover&bv=' + r.bvid, alt: '', loading: 'lazy', onError: (e) => { e.target.style.display = 'none'; const p = e.target.parentElement; if (p) p.setAttribute('data-noimg', '') } }),
           r.duration ? h('span', { 'data-wb-dur': '' }, fmtDur(r.duration)) : null),
         h('div', { className: 'body' },
           h('div', { 'data-wb-row': '' },
@@ -633,7 +660,7 @@ window.__ModuleLoader__.load({
             ? h('div', { 'data-wb-frames': '' }, ...frames.slice(0, 6).map((f, i) => h('img', {
               key: i,
               src: `${API}/store/media?kind=frame&bv=${r.bvid}&name=${encodeURIComponent(String(f.file || '').split('/').pop())}`,
-              alt: '', loading: 'lazy', onError: (e) => { e.target.style.display = 'none' },
+              alt: '', loading: 'lazy', onError: (e) => { e.target.style.display = 'none'; const p = e.target.parentElement; if (p) p.setAttribute('data-noimg', '') },
             })))
             : null,
           h('div', { 'data-wb-row': '' },
@@ -682,7 +709,7 @@ window.__ModuleLoader__.load({
           })))
           : h('div', { 'data-wb-grid': '' }, ...rows.map((r) => h('div', { key: r.bvid, 'data-wb-card': '' },
             h('div', { 'data-wb-cover': '' },
-              h('img', { src: API + '/store/media?kind=cover&bv=' + r.bvid, alt: '', loading: 'lazy', onError: (e) => { e.target.style.display = 'none' } }),
+              h('img', { src: API + '/store/media?kind=cover&bv=' + r.bvid, alt: '', loading: 'lazy', onError: (e) => { e.target.style.display = 'none'; const p = e.target.parentElement; if (p) p.setAttribute('data-noimg', '') } }),
               r.duration ? h('span', { 'data-wb-dur': '' }, fmtDur(r.duration)) : null),
             h('div', { 'data-wb-body': '' },
               h('div', { 'data-wb-row': '' },
@@ -776,7 +803,7 @@ window.__ModuleLoader__.load({
       return h('div', { 'data-wb-card': '' },
         h('div', { 'data-wb-cover': '' },
           h('span', {}, bv),
-          h('img', { src: `${API}/cover?bv=${bv}`, alt: '', loading: 'lazy', onError: (e) => { e.target.style.display = 'none' } }),
+          h('img', { src: `${API}/cover?bv=${bv}`, alt: '', loading: 'lazy', onError: (e) => { e.target.style.display = 'none'; const p = e.target.parentElement; if (p) p.setAttribute('data-noimg', '') } }),
           tier ? h(Tier, { t: tier }) : null,
           it.duration ? h('span', { 'data-wb-dur': '' }, fmtDur(it.duration)) : null),
         h('div', { 'data-wb-body': '' },
@@ -1326,7 +1353,7 @@ window.__ModuleLoader__.load({
           return h('div', { key: r.runId, 'data-wb-card': '' },
             h('div', { 'data-wb-cover': '' },
               h('span', {}, published ? '已发布成片' : r.stage === 'rendered' ? '待审成片' : r.title || r.runId),
-              r.hasCover ? h('img', { src: `/api/bili-wb/review/media?runId=${encodeURIComponent(r.runId)}&kind=cover`, alt: '', loading: 'lazy', onError: (e) => { e.target.style.display = 'none' } }) : null,
+              r.hasCover ? h('img', { src: `/api/bili-wb/review/media?runId=${encodeURIComponent(r.runId)}&kind=cover`, alt: '', loading: 'lazy', onError: (e) => { e.target.style.display = 'none'; const p = e.target.parentElement; if (p) p.setAttribute('data-noimg', '') } }) : null,
               h('span', { 'data-wb-badge': '', 'data-tone': tone, style: { position: 'absolute', left: '8px', top: '8px', zIndex: 2 } }, label),
               h('span', { 'data-wb-dur': '' }, r.seconds ? `${Math.round(r.seconds)}s` : '')),
             h('div', { 'data-wb-body': '' },
