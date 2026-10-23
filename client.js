@@ -391,6 +391,35 @@ window.__ModuleLoader__.load({
   padding:1px 4px; pointer-events:none;
 }
 
+/* 分段控件：热门 / 推荐。宽等于选项，不铺满。 */
+[data-wb-seg]{
+  display:inline-flex; flex:none;
+  padding:2px; gap:2px;
+  border-radius:var(--r-ctl);
+  background:var(--g3);
+}
+[data-wb-segbtn]{
+  height:28px; padding:0 14px;
+  border:0; border-radius:4px;
+  background:transparent; color:var(--muted);
+  font:inherit; font-size:13px; cursor:pointer;
+  white-space:nowrap;
+}
+[data-wb-segbtn]:hover{color:var(--ink)}
+[data-wb-segbtn][aria-selected="true"]{
+  background:var(--g1); color:var(--ink); font-weight:500;
+}
+
+/* 翻页：只在搜索结果里出现 */
+[data-wb-pager]{
+  display:flex; align-items:center; justify-content:center;
+  gap:12px; padding:20px 0 4px;
+}
+[data-wb-pageno]{
+  font-size:12.5px; color:var(--muted);
+  font-variant-numeric:tabular-nums;
+}
+
 [data-wb-toggle]{display:inline-flex; align-items:center; gap:8px; cursor:pointer; font-size:13px}
 [data-wb-toggle] input{width:16px; height:16px; accent-color:var(--ink); flex:none; margin:0}
 
@@ -819,107 +848,89 @@ window.__ModuleLoader__.load({
             h(Btn, { sm: true, onClick: () => window.open(it.url || ('https://www.bilibili.com/video/' + bv), '_blank') }, '打开'))))
     }
 
-    function SubVideo({ storeMap, cfg, onCommented, onKeywordsChanged }) {
+    function SubVideo({ storeMap, onCommented }) {
       const [q, setQ] = useState('')
       const [key, setKey] = useState('')
+      const [src, setSrc] = useState('hot')   // hot | rec
+      const [page, setPage] = useState(1)
       const [detail, setDetail] = useState('')
       const [comment, setComment] = useState(null)
-      const [editTags, setEditTags] = useState(false)
-      const pressRef = useRef(null)
-      const suppressRef = useRef(false)
-      const hot = useApi(key ? '' : '/hot?size=24', { auto: !key })
-      const search = useApi(key ? `/search?q=${encodeURIComponent(key)}&size=24` : '', { auto: Boolean(key) })
+      // 三种来源互斥：有关键词就是搜索，否则看 src
+      const mode = key ? 'search' : src
+      const hot = useApi(mode === 'hot' ? '/hot?size=24' : '', { auto: mode === 'hot' })
+      const rec = useApi(mode === 'rec' ? `/recommend?size=24&page=${page}` : '', { auto: mode === 'rec' })
+      const search = useApi(mode === 'search' ? `/search?q=${encodeURIComponent(key)}&size=24&page=${page}` : '', { auto: mode === 'search' })
       const watch = useApi(detail ? '/video?bv=' + encodeURIComponent(detail) : '', { auto: Boolean(detail) })
-      const items = key ? (search.data?.items || []) : (hot.data?.items || [])
-      const loading = key ? search.loading : hot.loading
-      const err = key ? search.err : hot.err
+
+      const active = mode === 'hot' ? hot : mode === 'rec' ? rec : search
+      const items = active.data?.items || []
+      const loading = active.loading
+      const err = active.err
       const d = watch.data?.data
 
-      const keywords = cfg?.keywords || []
-      const cancelPress = () => {
-        if (pressRef.current) { clearTimeout(pressRef.current); pressRef.current = null }
+      // 翻页：只在搜索时有效（热门/推荐是流，没有页概念）
+      const pages = Number(search.data?.pages) || 0
+      const total = Number(search.data?.total) || 0
+      const canPage = mode === 'search' && pages > 1
+
+      // 换来源/换词都要把页码重置，否则会停在上一次的页码上
+      const goSource = (next) => {
+        setKey(''); setQ(''); setSrc(next); setPage(1); setDetail('')
       }
-      const startPress = () => {
-        cancelPress()
-        pressRef.current = setTimeout(() => { suppressRef.current = true; setEditTags(true) }, 550)
-      }
-      const saveKeywords = async (next) => {
-        const r = await jpost('/config', { keywords: next })
-        if (!r.ok) return false
-        onKeywordsChanged?.()
-        return true
-      }
-      const delKeyword = async (k) => {
-        const next = keywords.filter((x) => x !== k)
-        if (await saveKeywords(next) && key === k) { setKey(''); setQ('') }
-      }
-      const addKeyword = async () => {
-        const v = String(prompt('加一个关注关键词：') || '').trim()
+      const doSearch = (kw) => {
+        const v = String(kw || '').trim()
         if (!v) return
-        if (!keywords.includes(v)) {
-          if (!await saveKeywords([...keywords, v])) return
-        }
-        setQ(v); setKey(v)
+        setKey(v); setPage(1); setDetail('')
       }
+      const goPage = (p) => {
+        const n = Math.max(1, Math.min(p, pages || 1))
+        if (n === page) return
+        setPage(n)
+        setDetail('')
+        // 翻页后回到列表顶部，否则还停在上次的滚动位置
+        try { document.querySelector('[data-wb-main]')?.scrollTo({ top: 0, behavior: 'smooth' }) } catch { /* ignore */ }
+      }
+
       const openComment = (it) => {
-        const rec = storeMap[it.bvid] || {}
+        const rec2 = storeMap[it.bvid] || {}
         setComment({
           label: it.title || it.bvid,
-          ctx: { title: it.title || '', up: it.author?.name || it.up?.name || '', quotes: rec.quotes || [] },
+          ctx: { title: it.title || '', up: it.author?.name || it.up?.name || '', quotes: rec2.quotes || [] },
           ids: { bv: it.bvid },
         })
       }
-      return h('div', {
-        'data-wb-col': '',
-        onClick: (e) => {
-          if (!editTags) return
-          if (e.target?.closest?.('[data-wb-tag]')) return
-          setEditTags(false)
-        },
-      },
-        h('div', { 'data-wb-searchwrap': '' },
-          h('input', {
-            'data-wb-search': '', placeholder: '搜视频、UP、关键词…', value: q,
-            onChange: (e) => setQ(e.target.value),
-            onKeyDown: (e) => { if (e.key === 'Enter') setKey(q.trim()) },
-          }),
-          h('span', { className: 'kbd' }, 'Enter')),
-        h('div', { 'data-wb-row': '', style: { justifyContent: 'center', marginBottom: '6px' } },
-          h('span', { 'data-wb-chip': '', 'data-sel': key ? undefined : '', style: { cursor: 'pointer' }, onClick: () => { if (editTags) return; setKey(''); setQ('') } }, '热门'),
-          ...keywords.map((k) => h('span', {
-            key: k, 'data-wb-chip': '', 'data-wb-tag': '',
-            'data-sel': key === k ? '' : undefined,
-            style: {
-              cursor: 'pointer', position: 'relative',
-              borderStyle: editTags ? 'dashed' : undefined,
-              paddingRight: editTags ? '18px' : undefined,
-            },
-            onPointerDown: startPress,
-            onPointerUp: cancelPress,
-            onPointerLeave: cancelPress,
-            onContextMenu: (e) => e.preventDefault(),
-            onClick: () => {
-              if (suppressRef.current) { suppressRef.current = false; return }
-              if (editTags) return
-              setKey(k); setQ(k)
-            },
-          }, k, editTags ? h('span', {
-            'data-wb-tagdel': '',
-            style: {
-              position: 'absolute', top: '-7px', right: '-7px', width: '14px', height: '14px',
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              borderRadius: '50%', background: 'var(--dsw-alias-label-primary, #0f1115)',
-              color: 'var(--dsw-alias-bg-base, #fff)', fontSize: '11px', lineHeight: 1,
-            },
-            onPointerDown: (e) => e.stopPropagation(),
-            onClick: (e) => { e.stopPropagation(); delKeyword(k) },
-          }, '×') : null)),
-          h('span', { 'data-wb-chip': '', style: { cursor: 'pointer' }, onClick: () => { if (!editTags) addKeyword() } }, '+ 关键词')),
-        editTags ? h(Note, {}, '点标签右上角 × 删除 · 点空白处退出') : null,
+      return h('div', { 'data-wb-col': '' },
+        /* 来源切换 + 搜索框：热门和推荐是「不用输入就能刷」的两种流，
+           搜索框常驻，随时可以直接搜。 */
+        h('div', { 'data-wb-row': '', style: { gap: '8px', alignItems: 'center', marginBottom: '4px' } },
+          h('div', { 'data-wb-seg': '' },
+            h('button', {
+              'data-wb-segbtn': '', 'aria-selected': mode === 'hot' ? 'true' : 'false',
+              onClick: () => goSource('hot'),
+            }, '热门'),
+            h('button', {
+              'data-wb-segbtn': '', 'aria-selected': mode === 'rec' ? 'true' : 'false',
+              onClick: () => goSource('rec'),
+            }, '推荐')),
+          h('div', { 'data-wb-searchwrap': '', style: { flex: 1, maxWidth: 'none' } },
+            h('input', {
+              'data-wb-search': '', placeholder: '搜视频、UP、关键词…', value: q,
+              onChange: (e) => setQ(e.target.value),
+              onKeyDown: (e) => { if (e.key === 'Enter') doSearch(q) },
+            }),
+            h('span', { className: 'kbd' }, 'Enter')),
+          key ? h(Btn, { sm: true, onClick: () => goSource(src) }, '退出搜索') : null),
+
+        /* 这一行说明当前看的是什么，以及推荐是否个性化（真实状态） */
         h('div', { 'data-wb-row': '' },
-          h(Note, {}, key ? `搜索：${key}` : '综合热门'),
+          h(Note, {}, mode === 'hot'
+            ? '综合热门 · 全站一致'
+            : mode === 'rec'
+              ? (rec.data?.personalized === false ? '推荐 · 未登录，当前是通用推荐' : '推荐 · 按你的观看偏好')
+              : `搜索：${key}${total ? ` · 共 ${total} 条` : ''}`),
           h('div', { 'data-wb-grow': '' }),
-          h(Btn, { sm: true, onClick: key ? search.reload : hot.reload }, '刷新')),
+          h(Btn, { sm: true, onClick: active.reload }, '刷新')),
+
         comment ? h(InteractComposer, {
           key: comment.ids?.bv || 'comment',
           kind: 'comment', target: comment,
@@ -943,7 +954,15 @@ window.__ModuleLoader__.load({
           onWatch: setDetail,
           onComment: openComment,
         }))),
-        !loading && !items.length ? h(Note, {}, key ? '没搜到，换个词' : '热门拉不到（看看 bili 是否登录）') : null)
+        !loading && !items.length
+          ? h(Note, {}, mode === 'search' ? '没搜到，换个词' : mode === 'rec' ? '推荐拉不到（看看 bili 是否登录）' : '热门拉不到（看看 bili 是否登录）')
+          : null,
+
+        /* 翻页：只在搜索结果里出现，且确实有多页 */
+        canPage ? h('div', { 'data-wb-pager': '' },
+          h(Btn, { sm: true, disabled: page <= 1, onClick: () => goPage(page - 1) }, '上一页'),
+          h('span', { 'data-wb-pageno': '' }, `第 ${page} / ${pages} 页`),
+          h(Btn, { sm: true, disabled: page >= pages, onClick: () => goPage(page + 1) }, '下一页')) : null)
     }
 
     function SubInbox({ onCommented }) {
@@ -1151,7 +1170,7 @@ window.__ModuleLoader__.load({
           ...[['video', '视频'], ['msg', '消息'], ['set', '刷B站设置']].map(([k, l]) =>
             h('button', { key: k, 'data-wb-btn': '', 'data-sm': '', 'data-primary': sub === k ? '' : undefined, onClick: () => setSub(k) }, l)),
           sub === 'video' && basket.length ? h(Chip, {}, `创作篮 ${basket.length}`) : null),
-        sub === 'video' ? h(SubVideo, { storeMap, cfg: cfgRes.data?.config, onCommented: store.reload, onKeywordsChanged: cfgRes.reload }) : null,
+        sub === 'video' ? h(SubVideo, { storeMap, onCommented: store.reload }) : null,
         sub === 'msg' ? h(SubInbox, { onCommented: store.reload }) : null,
         sub === 'set' ? h(SubSettings, { onRunRound: () => store.reload(), onSaved: cfgRes.reload }) : null)
     }

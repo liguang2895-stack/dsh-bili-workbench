@@ -528,7 +528,7 @@ export function apply(ctx) {
       return sendJson(res, 200, { ok: r.ok, error: r.error || null })
     }
 
-    /* ══════════ 刷B站：热门 / 搜索 / 看懂 / 消息 / 数据 ══════════ */
+    /* ══════════ 刷B站：热门 / 推荐 / 搜索 / 看懂 / 消息 / 数据 ══════════ */
     if (req.method === 'GET' && path === '/hot') {
       const kind = q.get('kind') === 'rank' ? 'rank' : 'popular'
       const size = Math.max(1, Math.min(Number(q.get('size')) || 20, 50))
@@ -540,13 +540,33 @@ export function apply(ctx) {
       const r = await runBili(args, { timeoutMs: 40000 })
       return sendJson(res, 200, { ok: r.ok, kind, zone, items: usableItems(r.data?.items), error: r.error || null })
     }
+    /* 首页推荐流：按当前账号的观看偏好个性化，每次 --page 加 1 换一批。
+       personalized=false 时说明账号没登录，拿到的是通用推荐。 */
+    if (req.method === 'GET' && path === '/recommend') {
+      const size = Math.max(1, Math.min(Number(q.get('size')) || 24, 30))
+      const page = Math.max(1, Math.min(Number(q.get('page')) || 1, 500))
+      const r = await runBili(['feed', 'recommend', '--count', String(size), '--page', String(page)], { timeoutMs: 45000 })
+      const items = usableItems(r.data?.items)
+      return sendJson(res, 200, {
+        ok: r.ok, page,
+        personalized: r.data?.personalized !== false,
+        items, error: r.error || null,
+      })
+    }
     if (req.method === 'GET' && path === '/search') {
       const kw = String(q.get('q') || '').trim().slice(0, 60)
       if (!kw) return sendJson(res, 200, { ok: true, items: [], keyword: '' })
       const size = Math.max(1, Math.min(Number(q.get('size')) || 20, 50))
+      const page = Math.max(1, Math.min(Number(q.get('page')) || 1, 50))
       const order = ['default', 'views', 'new', 'danmaku', 'favorites', 'comments'].includes(String(q.get('order'))) ? String(q.get('order')) : 'default'
-      const r = await runBili(['search', 'video', kw, '--order', order, '--size', String(size)], { timeoutMs: 45000 })
-      return sendJson(res, 200, { ok: r.ok, keyword: kw, total: r.data?.total || 0, items: usableItems(r.data?.items), error: r.error || null })
+      const r = await runBili(['search', 'video', kw, '--order', order, '--size', String(size), '--page', String(page)], { timeoutMs: 45000 })
+      const total = Number(r.data?.total) || 0
+      // B站 只给总数，页数自己算；没有总数时退化成「未知」
+      const pages = total > 0 ? Math.ceil(Math.min(total, 1000) / size) : 0
+      return sendJson(res, 200, {
+        ok: r.ok, keyword: kw, total, page, pages, size,
+        items: usableItems(r.data?.items), error: r.error || null,
+      })
     }
     if (req.method === 'GET' && path === '/video') {
       const bv = String(q.get('bv') || '').trim()
